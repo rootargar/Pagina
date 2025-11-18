@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Capacitaciones</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome para iconos -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --light-bg: #ecf0f1;
+        }
+        
+        .sidebar {
+            background-color: var(--secondary-color);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 5px;
+        }
+        
+        .sidebar .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .sidebar .nav-link.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+        }
+        
+        .content-area {
+            background-color: var(--light-bg);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            font-weight: bold;
+        }
+        
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+        
+        .stats-card i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .stats-card .count {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        
+        .stats-card .label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        .top-nav {
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-menu img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid p-0">
+        <div class="row g-0">
+            <!-- Sidebar -->
+            <div class="col-lg-2 sidebar d-none d-lg-block">
+                <div class="d-flex flex-column px-3 pt-4 pb-2">
+                    <h4 class="text-center mb-4">KwCapacitaciones</h4>
+                    <div class="nav flex-column">
+                        <a class="nav-link active" href="index.html">
+                            <i class="fas fa-tachometer-alt"></i> Inicio
+                        </a>
+                        <a class="nav-link" href="capacitaciones.html">
+                            <i class="fas fa-graduation-cap"></i> Refacciones
+                        </a>
+                        <a class="nav-link" href="mejora-continua.html">
+                            <i class="fas fa-chart-line"></i> Servicio
+                        </a>
+                        <a class="nav-link" href="estructura-admin.html">
+                            <i class="fas fa-sitemap"></i> Estructura Admin
+                        </a>
+                        <a class="nav-link" href="reportes.html">
+                            <i class="fas fa-file-alt"></i> Reportes
+                        </a>
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-cog"></i> Configuración
+                        </a>
+                        <a class="nav-link text-danger mt-5" href="#">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-lg-10 content-area">
+                <!-- Top Navigation -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <nav class="navbar navbar-expand-lg top-nav">
+                            <div class="container-fluid">
+                                <!-- Mobile Menu Button -->
+                                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+                                    <i class="fas fa-bars"></i>
+                                </button>
+                                
+                                <div class="ms-auto d-flex align-items-center">
+                                    <div class="dropdown">
+                                        <a class="nav-link dropdown-toggle user-menu" href="#" role="button" data-bs-toggle="dropdown">
+                                            <img src="/api/placeholder/40/40" alt="User">
+                                            <span class="ms-2 d-none d-md-inline">Admin</span>
+                                        </a>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i> Perfil</a></li>
+                                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i> Configuración</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="#"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </nav>
+                    </div>
+                </div>
+                
+                <!-- Mobile Sidebar -->
+                <div class="collapse navbar-collapse d-lg-none mb-4" id="sidebarMenu">
+                    <div class="bg-white p-3 rounded shadow">
+                        <div class="nav flex-column">
+                            <a class="nav-link active" href="index.html">
+                                <i class="fas fa-tachometer-alt"></i> Inicio
+                            </a>
+                            <a class="nav-link" href="capacitaciones.html">
+                                <i class="fas fa-graduation-cap"></i> Reafacciones
+                            </a>
+                            <a class="nav-link" href="mejora-continua.html">
+                                <i class="fas fa-chart-line"></i> Servicio
+                            </a>
+                            <a class="nav-link" href="estructura-admin.html">
+                                <i class="fas fa-sitemap"></i> Estructura Admin
+                            </a>
+                            <a class="nav-link" href="reportes.html">
+                                <i class="fas fa-file-alt"></i> Reportes
+                            </a>
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-cog"></i> Configuración
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Page Title -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Inicio</h2>
+                    <div>
+                        <span class="text-muted">Hoy: <strong id="current-date">28/02/2025</strong></span>
+                    </div>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="menu-cards">
+                    <div class="menu-card">
+                        <i class="fas fa-cogs"></i>
+                        <h3>Refacciones</h3>
+                        <p>Consulta de precios y existencias de refacciones</p>
+                        <a href="?seccion=refacciones">Acceder</a>
+                    </div>
+
+                    <div class="menu-card">
+                        <i class="fas fa-boxes"></i>
+                        <h3>Inventarios</h3>
+                        <p>Consulta de Inventarios Refacciones - Partes</p>
+                        <a href="?seccion=inventarios">Acceder</a>
+                    </div>
+
+                    <div class="menu-card">
+                        <i class="fas fa-tools"></i>
+                        <h3>Servicio</h3>
+                        <p>Gestión de servicios y mantenimiento</p>
+                        <a href="?seccion=servicio">Acceder</a>
+                    </div>
+                    <div class="menu-card">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <h3>Indicadores</h3>
+                        <p>Indicadores Servicio Estadías Graficos</p>
+                        <a href="?seccion=indi">Acceder</a>
+                    </div>
+                    <div class="menu-card">
+                        <i class="fas fa-user-cog"></i>
+                        <h3>Administración</h3>
+                        <p>Funciones administrativas y soporte</p>
+                        <a href="?seccion=admin">Acceder</a>
+                    </div>
+                
+                <!-- Main Content Cards -->
+                <div class="row">
+                    <!-- Últimas Capacitaciones -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Últimas Capacitaciones</span>
+                                <a href="capacitaciones.html" class="btn btn-sm btn-primary">Ver Todas</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Nombre</th>
+                                                <th>Fecha</th>
+                                                <th>Participantes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Seguridad en el Trabajo</td>
+                                                <td>25/02/2025</td>
+                                                <td>42</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Excel Avanzado</td>
+                                                <td>22/02/2025</td>
+                                                <td>15</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Comunicación Efectiva</td>
+                                                <td>18/02/2025</td>
+                                                <td>28</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Gestión del Tiempo</td>
+                                                <td>15/02/2025</td>
+                                                <td>35</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Acciones Recientes -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <span>Actividad Reciente</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="activity-item d-flex align-items-start mb-3">
+                                    <div class="bg-primary rounded-circle p-2 text-white me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-user-plus"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0 fw-bold">Nuevo empleado registrado</p>
+                                        <p class="text-muted small mb-0">Carlos Ramírez se unió al departamento de TI</p>
+                                        <span class="text-muted small">Hace 2 horas</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="activity-item d-flex align-items-start mb-3">
+                                    <div class="bg-success rounded-circle p-2 text-white me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0 fw-bold">Capacitación completada</p>
+                                        <p class="text-muted small mb-0">15 empleados completaron "Excel Avanzado"</p>
+                                        <span class="text-muted small">Hace 5 horas</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="activity-item d-flex align-items-start mb-3">
+                                    <div class="bg-warning rounded-circle p-2 text-white me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0 fw-bold">Recordatorio de capacitación</p>
+                                        <p class="text-muted small mb-0">Seguridad en el Trabajo - Fecha límite: 01/03/2025</p>
+                                        <span class="text-muted small">Hace 1 día</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="activity-item d-flex align-items-start">
+                                    <div class="bg-info rounded-circle p-2 text-white me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fas fa-file-alt"></i>
+                                    </div>
+                                    <div>
+                                        <p class="mb-0 fw-bold">Nueva política publicada</p>
+                                        <p class="text-muted small mb-0">Política de trabajo remoto actualizada</p>
+                                        <span class="text-muted small">Hace 2 días</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Próximas Capacitaciones -->
+                    <div class="col-md-12 mb-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Próximas Capacitaciones</span>
+                                <a href="#" class="btn btn-sm btn-primary">Programar Capacitación</a>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Nombre</th>
+                                                <th>Instructor</th>
+                                                <th>Departamento</th>
+                                                <th>Fecha</th>
+                                                <th>Duración</th>
+                                                <th>Inscritos</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Liderazgo Efectivo</td>
+                                                <td>María González</td>
+                                                <td>Recursos Humanos</td>
+                                                <td>05/03/2025</td>
+                                                <td>8 horas</td>
+                                                <td>18/20</td>
+                                                <td><span class="badge bg-warning">Próxima</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Protección de Datos</td>
+                                                <td>Juan Pérez</td>
+                                                <td>TI</td>
+                                                <td>10/03/2025</td>
+                                                <td>4 horas</td>
+                                                <td>25/30</td>
+                                                <td><span class="badge bg-warning">Próxima</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Atención al Cliente</td>
+                                                <td>Laura Sánchez</td>
+                                                <td>Ventas</td>
+                                                <td>15/03/2025</td>
+                                                <td>6 horas</td>
+                                                <td>12/15</td>
+                                                <td><span class="badge bg-warning">Próxima</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></button>
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Set current date
+        document.addEventListener('DOMContentLoaded', function() {
+            const date = new Date();
+            const formattedDate = date.getDate().toString().padStart(2, '0') + '/' + 
+                (date.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                date.getFullYear();
+            document.getElementById('current-date').textContent = formattedDate;
+        });
+    </script>
+</body>
+</html>
