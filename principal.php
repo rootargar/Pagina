@@ -28,6 +28,12 @@ include 'includes/header.php';
             case 'inicio':
                 include 'secciones/inicio.php';
                 break;
+            case 'cotizador':
+                include 'secciones/cotizador.php';
+                break;
+            case 'consulta':
+                include 'secciones/consulta.php';
+                break;
             case 'refacciones':
                 include 'secciones/refacciones.php';
                 break;
