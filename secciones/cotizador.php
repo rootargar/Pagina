@@ -2,6 +2,13 @@
 // Incluir archivo de conexión
 include 'conexion.php';
 
+// Configuración de paginación
+$resultadosPorPagina = 15;
+$paginaActual = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+$paginaActual = max(1, $paginaActual);
+$totalResultados = 0;
+$totalPaginas = 0;
+
 // Función para calcular nuevo precio con margen
 function calcularNuevoPrecio($costo, $porcentaje) {
     if ($porcentaje <= 9 || $porcentaje >= 100) {
@@ -10,71 +17,174 @@ function calcularNuevoPrecio($costo, $porcentaje) {
     return $costo / (1 - ($porcentaje / 100));
 }
 
-// Función para mostrar resultados
-function mostrarResultados($conn, $query, $params, $nuevosPrecios) {
-    $result = sqlsrv_query($conn, $query, $params);
+// Función para contar resultados
+function contarResultados($conn, $queryBase, $params) {
+    $sqlCount = str_replace("SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
+                        ct.Nombre as Categoria, ct.PorcMargenUtilMin,
+                        ((c.Costo / (1 - (ct.PorcMargenUtilMin / 100))) - c.Costo + c.Costo) as PrecioMinimo,
+                        c.Costo", "SELECT COUNT(*) as Total", $queryBase);
+
+    $stmtCount = sqlsrv_query($conn, $sqlCount, $params);
+
+    if ($stmtCount !== false) {
+        $rowCount = sqlsrv_fetch_array($stmtCount, SQLSRV_FETCH_ASSOC);
+        sqlsrv_free_stmt($stmtCount);
+        return $rowCount['Total'];
+    }
+
+    return 0;
+}
+
+// Función para mostrar resultados con paginación
+function mostrarResultados($conn, $queryBase, $params, $nuevosPrecios, $paginaActual, $resultadosPorPagina, &$totalResultados, &$totalPaginas, $tipoBusqueda, $criterio, $idAlmacen) {
+    // Contar total de resultados
+    $totalResultados = contarResultados($conn, $queryBase, $params);
+    $totalPaginas = $totalResultados > 0 ? ceil($totalResultados / $resultadosPorPagina) : 0;
+
+    // Calcular offset
+    $offset = ($paginaActual - 1) * $resultadosPorPagina;
+
+    // Agregar paginación a la query
+    $queryPaginada = $queryBase . " ORDER BY a.NumArticulo OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+    $paramsPaginados = array_merge($params, [$offset, $resultadosPorPagina]);
+
+    $result = sqlsrv_query($conn, $queryPaginada, $paramsPaginados);
 
     if ($result === false) {
         die(print_r(sqlsrv_errors(), true));
     }
 
     if (sqlsrv_has_rows($result)) {
+        echo "<div class='results-info'>";
+        echo "<i class='fas fa-info-circle'></i> ";
+        echo "Mostrando resultados " . ($offset + 1) . " - " . min($offset + $resultadosPorPagina, $totalResultados) . " de <strong>" . $totalResultados . "</strong>";
+        echo "</div>";
+
         echo "<form method='POST' action='' id='formularioPrincipal'>";
-        echo "<input type='hidden' name='id_almacen' value='" . htmlspecialchars($_GET['id_almacen'] ?? '') . "'>";
-        echo "<input type='hidden' name='num_parte' value='" . htmlspecialchars($_GET['num_parte'] ?? '') . "'>";
-        echo "<input type='hidden' name='descripcion' value='" . htmlspecialchars($_GET['descripcion'] ?? '') . "'>";
+        echo "<input type='hidden' name='id_almacen' value='" . htmlspecialchars($idAlmacen) . "'>";
+        echo "<input type='hidden' name='num_parte' value='" . ($tipoBusqueda == 'parte' ? htmlspecialchars($criterio) : '') . "'>";
+        echo "<input type='hidden' name='descripcion' value='" . ($tipoBusqueda == 'descripcion' ? htmlspecialchars($criterio) : '') . "'>";
+        echo "<div class='table-wrapper'>";
         echo "<table>";
-        echo "<tr><th>Parte</th><th>Nombre</th><th>Existencia</th><th>Categoría</th><th>Precio Mínimo</th><th>% Categoría</th><th>% Usuario</th><th>Nuevo Precio</th></tr>";
+        echo "<thead><tr><th>Parte</th><th>Nombre</th><th>Existencia</th><th>Categoría</th><th>Precio Mínimo</th><th>% Categoría</th><th>% Usuario</th><th>Nuevo Precio</th></tr></thead>";
+        echo "<tbody>";
 
-while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
-    $id = $row['IdArticulo'];
-    $costo = $row['Costo'];
-    $precioMinimo = $row['PrecioMinimo'];
-    $nuevoPrecio = $nuevosPrecios[$id] ?? '';
+        while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
+            $id = $row['IdArticulo'];
+            $costo = $row['Costo'];
+            $precioMinimo = $row['PrecioMinimo'];
+            $nuevoPrecio = $nuevosPrecios[$id] ?? '';
 
-    echo "<tr>";
-    echo "<td>" . htmlspecialchars($row['NumArticulo']) . "</td>";
-    echo "<td>" . htmlspecialchars($row['Nombre']) . "</td>";
-    echo "<td>" . htmlspecialchars($row['Existencia']) . "</td>";
-    echo "<td>" . htmlspecialchars($row['Categoria']) . "</td>";
-    echo "<td>$" . number_format($row['PrecioMinimo'], 2) . "</td>";
-    echo "<td>" . htmlspecialchars($row['PorcMargenUtilMin']) . "%</td>";
-    echo "<td>
-        <input type='hidden' name='costo[$id]' value='$costo' class='costo-hidden'>
-        <input type='hidden' name='precio_minimo[$id]' value='$precioMinimo' class='precio-minimo-hidden'>
-        <input type='number'
-               name='porcentaje[$id]'
-               placeholder='%'
-               step='0.01'
-               min='10'
-               max='80'
-               value='" . htmlspecialchars($_POST['porcentaje'][$id] ?? '') . "'
-               class='porcentaje-input'
-               data-costo='$costo'
-               data-precio-minimo='$precioMinimo'
-               data-id='$id'
-               onblur='calcularPrecioAutomatico(this)'>
-    </td>";
+            echo "<tr>";
+            echo "<td>" . htmlspecialchars($row['NumArticulo']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['Nombre']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['Existencia']) . "</td>";
+            echo "<td>" . htmlspecialchars($row['Categoria']) . "</td>";
+            echo "<td>$" . number_format($row['PrecioMinimo'], 2) . "</td>";
+            echo "<td>" . htmlspecialchars($row['PorcMargenUtilMin']) . "%</td>";
+            echo "<td>
+                <input type='hidden' name='costo[$id]' value='$costo' class='costo-hidden'>
+                <input type='hidden' name='precio_minimo[$id]' value='$precioMinimo' class='precio-minimo-hidden'>
+                <input type='number'
+                       name='porcentaje[$id]'
+                       placeholder='%'
+                       step='0.01'
+                       min='10'
+                       max='80'
+                       value='" . htmlspecialchars($_POST['porcentaje'][$id] ?? '') . "'
+                       class='porcentaje-input'
+                       data-costo='$costo'
+                       data-precio-minimo='$precioMinimo'
+                       data-id='$id'
+                       onblur='calcularPrecioAutomatico(this)'>
+            </td>";
 
-    // Determinar el color basado en la comparación con precio mínimo
-    $colorClass = '';
-    $textoAdicional = '';
-    if ($nuevoPrecio) {
-        if ($nuevoPrecio < $precioMinimo) {
-            $colorClass = 'precio-bajo-minimo';
-            $textoAdicional = ' (Precio bajo)';
-        } else {
-            $colorClass = 'precio-sobre-minimo';
+            $colorClass = '';
+            $textoAdicional = '';
+            if ($nuevoPrecio) {
+                if ($nuevoPrecio < $precioMinimo) {
+                    $colorClass = 'precio-bajo-minimo';
+                    $textoAdicional = ' -MVMC';
+                } else {
+                    $colorClass = 'precio-sobre-minimo';
+                }
+            }
+
+            echo "<td><span id='precio_$id' class='precio-resultado $colorClass'>" .
+                 ($nuevoPrecio ? "$" . number_format($nuevoPrecio, 2) . $textoAdicional : "") .
+                 "</span></td>";
+            echo "</tr>";
         }
-    }
 
-    echo "<td><span id='precio_$id' class='precio-resultado $colorClass'>" .
-         ($nuevoPrecio ? "$" . number_format($nuevoPrecio, 2) . $textoAdicional : "") .
-         "</span></td>";
-    echo "</tr>";
-}
- echo "</table>";
+        echo "</tbody>";
+        echo "</table>";
+        echo "</div>";
         echo "</form>";
+
+        // Mostrar paginación si hay más de una página
+        if ($totalPaginas > 1) {
+            echo "<div class='pagination-container'>";
+            echo "<div class='pagination-info'>Página " . $paginaActual . " de " . $totalPaginas . "</div>";
+            echo "<ul class='pagination'>";
+
+            // Primera página
+            if ($paginaActual > 1) {
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=1" title="Primera página"><i class="fas fa-angle-double-left"></i></a></li>';
+            } else {
+                echo '<li><span class="disabled"><i class="fas fa-angle-double-left"></i></span></li>';
+            }
+
+            // Página anterior
+            if ($paginaActual > 1) {
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=' . ($paginaActual - 1) . '" title="Página anterior"><i class="fas fa-angle-left"></i></a></li>';
+            } else {
+                echo '<li><span class="disabled"><i class="fas fa-angle-left"></i></span></li>';
+            }
+
+            // Números de página
+            $rango = 2;
+            $inicio = max(1, $paginaActual - $rango);
+            $fin = min($totalPaginas, $paginaActual + $rango);
+
+            if ($inicio > 1) {
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=1">1</a></li>';
+                if ($inicio > 2) {
+                    echo '<li><span class="dots">...</span></li>';
+                }
+            }
+
+            for ($i = $inicio; $i <= $fin; $i++) {
+                if ($i == $paginaActual) {
+                    echo '<li><span class="active">' . $i . '</span></li>';
+                } else {
+                    echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=' . $i . '">' . $i . '</a></li>';
+                }
+            }
+
+            if ($fin < $totalPaginas) {
+                if ($fin < $totalPaginas - 1) {
+                    echo '<li><span class="dots">...</span></li>';
+                }
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=' . $totalPaginas . '">' . $totalPaginas . '</a></li>';
+            }
+
+            // Página siguiente
+            if ($paginaActual < $totalPaginas) {
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=' . ($paginaActual + 1) . '" title="Página siguiente"><i class="fas fa-angle-right"></i></a></li>';
+            } else {
+                echo '<li><span class="disabled"><i class="fas fa-angle-right"></i></span></li>';
+            }
+
+            // Última página
+            if ($paginaActual < $totalPaginas) {
+                echo '<li><a href="?seccion=cotizador&id_almacen=' . urlencode($idAlmacen) . '&' . ($tipoBusqueda == 'parte' ? 'num_parte' : 'descripcion') . '=' . urlencode($criterio) . '&buscar_' . $tipoBusqueda . '=1&pagina=' . $totalPaginas . '" title="Última página"><i class="fas fa-angle-double-right"></i></a></li>';
+            } else {
+                echo '<li><span class="disabled"><i class="fas fa-angle-double-right"></i></span></li>';
+            }
+
+            echo "</ul>";
+            echo "</div>";
+        }
     } else {
         echo "<p class='message error'><i class='fas fa-exclamation-triangle'></i> No se encontraron resultados para los criterios especificados.</p>";
     }
@@ -252,10 +362,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         gap: 10px;
     }
 
+    .results-info {
+        background: #e8f4f8;
+        color: #0c5460;
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-left: 4px solid #17a2b8;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+    }
+
     table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 20px;
+        margin-top: 15px;
         background: white;
         border-radius: 8px;
         overflow: hidden;
@@ -270,6 +397,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         text-transform: uppercase;
         font-size: 0.85em;
         letter-spacing: 0.5px;
+        white-space: nowrap;
     }
 
     td {
@@ -277,11 +405,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         border-bottom: 1px solid #f0f0f0;
     }
 
-    tr:hover {
+    tbody tr:hover {
         background-color: #f8f9fa;
     }
 
-    tr:last-child td {
+    tbody tr:last-child td {
         border-bottom: none;
     }
 
@@ -359,6 +487,80 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         border-left: 4px solid #17a2b8;
     }
 
+    /* Paginación */
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px 0;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        border-top: 2px solid #ecf0f1;
+        padding-top: 20px;
+    }
+
+    .pagination-info {
+        color: #2c3e50;
+        font-weight: bold;
+        margin: 0 15px;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 5px;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        flex-wrap: wrap;
+    }
+
+    .pagination a,
+    .pagination span {
+        display: inline-block;
+        padding: 8px 12px;
+        border: 2px solid #3498db;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #3498db;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        min-width: 40px;
+        text-align: center;
+    }
+
+    .pagination a:hover {
+        background: #3498db;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+    }
+
+    .pagination .active {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        border-color: #2980b9;
+    }
+
+    .pagination .disabled {
+        color: #bdc3c7;
+        border-color: #bdc3c7;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .pagination .dots {
+        border: none;
+        color: #7f8c8d;
+        cursor: default;
+    }
+
+    .pagination .dots:hover {
+        background: transparent;
+        transform: none;
+        box-shadow: none;
+    }
+
     @media (max-width: 768px) {
         .search-container {
             grid-template-columns: 1fr;
@@ -366,9 +568,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
 
         table {
             font-size: 12px;
-            display: block;
-            overflow-x: auto;
-            white-space: nowrap;
         }
 
         th, td {
@@ -382,6 +581,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         .section-header {
             flex-direction: column;
             align-items: flex-start;
+        }
+
+        .pagination a,
+        .pagination span {
+            padding: 6px 10px;
+            font-size: 14px;
+            min-width: 35px;
+        }
+
+        .pagination-info {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
         }
     }
 </style>
@@ -476,12 +688,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
         if (!isset($_GET['id_almacen']) || $_GET['id_almacen'] == '0') {
             echo "<div class='message info'><i class='fas fa-info-circle'></i> Por favor seleccione un almacén para realizar búsquedas.</div>";
         } else {
+            $id_almacen = $_GET['id_almacen'];
+
             // Búsqueda por número de parte
             if (isset($_GET['buscar_parte']) && !empty($_GET['num_parte'])) {
                 $num_parte = $_GET['num_parte'];
-                $id_almacen = $_GET['id_almacen'];
 
-                $query = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
+                $queryBase = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
                         ct.Nombre as Categoria, ct.PorcMargenUtilMin,
                         ((c.Costo / (1 - (ct.PorcMargenUtilMin / 100))) - c.Costo + c.Costo) as PrecioMinimo,
                         c.Costo
@@ -498,15 +711,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
                 AND a.NumArticulo LIKE ?";
 
                 $params = array($id_almacen, $id_almacen, $id_almacen, "%$num_parte%");
-                mostrarResultados($conn, $query, $params, $nuevosPrecios);
+                mostrarResultados($conn, $queryBase, $params, $nuevosPrecios, $paginaActual, $resultadosPorPagina, $totalResultados, $totalPaginas, 'parte', $num_parte, $id_almacen);
             }
 
             // Búsqueda por descripción
             elseif (isset($_GET['buscar_descripcion']) && !empty($_GET['descripcion'])) {
                 $descripcion = $_GET['descripcion'];
-                $id_almacen = $_GET['id_almacen'];
 
-                $query = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
+                $queryBase = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
                         ct.Nombre as Categoria, ct.PorcMargenUtilMin,
                         ((c.Costo / (1 - (ct.PorcMargenUtilMin / 100))) - c.Costo + c.Costo) as PrecioMinimo,
                         c.Costo
@@ -523,56 +735,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
                 AND a.Nombre LIKE ?";
 
                 $params = array($id_almacen, $id_almacen, $id_almacen, "%$descripcion%");
-                mostrarResultados($conn, $query, $params, $nuevosPrecios);
-            }
-
-            // Si se calcularon precios, volver a mostrar los resultados
-            elseif ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['calcular_precio'])) {
-                if (!empty($_POST['num_parte'])) {
-                    $num_parte = $_POST['num_parte'];
-                    $id_almacen = $_POST['id_almacen'];
-
-                    $query = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
-                            ct.Nombre as Categoria, ct.PorcMargenUtilMin,
-                            ((c.Costo / (1 - (ct.PorcMargenUtilMin / 100))) - c.Costo + c.Costo) as PrecioMinimo,
-                            c.Costo
-                    FROM InvArticulos a
-                    INNER JOIN invArticulosCostos c ON a.IdArticulo = c.IdArticulo
-                    INNER JOIN invArticulosCat ct ON a.IdArticuloCat = ct.IdArticuloCat
-                    INNER JOIN InvArticulosExistencias e ON a.IdArticulo = e.IdArticulo
-                    WHERE c.IdAlmacen = ? AND e.IdAlmacen = ?
-                    AND a.IdTipoInventario = 1
-                    AND a.Activo = 1
-                    AND e.ExistenciaActual > 0
-                    AND c.ExistenciaActual > 0
-                    AND c.FechaUltimaEntrada = (SELECT MAX(cs.FechaUltimaEntrada) FROM invArticulosCostos cs WHERE cs.IdArticulo = c.IdArticulo AND cs.ExistenciaActual > 0 AND cs.IdAlmacen = ?)
-                    AND a.NumArticulo LIKE ?";
-
-                    $params = array($id_almacen, $id_almacen, $id_almacen, "%$num_parte%");
-                    mostrarResultados($conn, $query, $params, $nuevosPrecios);
-                } elseif (!empty($_POST['descripcion'])) {
-                    $descripcion = $_POST['descripcion'];
-                    $id_almacen = $_POST['id_almacen'];
-
-                    $query = "SELECT a.IdArticulo, a.NumArticulo, a.Nombre, e.ExistenciaActual as Existencia,
-                            ct.Nombre as Categoria, ct.PorcMargenUtilMin,
-                            ((c.Costo / (1 - (ct.PorcMargenUtilMin / 100))) - c.Costo + c.Costo) as PrecioMinimo,
-                            c.Costo
-                    FROM InvArticulos a
-                    INNER JOIN invArticulosCostos c ON a.IdArticulo = c.IdArticulo
-                    INNER JOIN invArticulosCat ct ON a.IdArticuloCat = ct.IdArticuloCat
-                    INNER JOIN InvArticulosExistencias e ON a.IdArticulo = e.IdArticulo
-                    WHERE c.IdAlmacen = ? AND e.IdAlmacen = ?
-                    AND a.IdTipoInventario = 1
-                    AND a.Activo = 1
-                    AND e.ExistenciaActual > 0
-                    AND c.ExistenciaActual > 0
-                    AND c.FechaUltimaEntrada = (SELECT MAX(cs.FechaUltimaEntrada) FROM invArticulosCostos cs WHERE cs.IdArticulo = c.IdArticulo AND cs.ExistenciaActual > 0 AND cs.IdAlmacen = ?)
-                    AND a.Nombre LIKE ?";
-
-                    $params = array($id_almacen, $id_almacen, $id_almacen, "%$descripcion%");
-                    mostrarResultados($conn, $query, $params, $nuevosPrecios);
-                }
+                mostrarResultados($conn, $queryBase, $params, $nuevosPrecios, $paginaActual, $resultadosPorPagina, $totalResultados, $totalPaginas, 'descripcion', $descripcion, $id_almacen);
             } else {
                 echo "<div class='message info'><i class='fas fa-search'></i> Utilice uno de los formularios de búsqueda para encontrar refacciones.</div>";
             }
